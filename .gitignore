@@ -1,0 +1,8 @@
+logs/*.log
+node_modules/
+dist/
+*.o
+server/bin/
+# Artefactos de Figma Make (instrucciones para agentes, no parte del proyecto)
+AGENTS.md
+CLAUDE.md

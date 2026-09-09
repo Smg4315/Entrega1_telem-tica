@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+/* TT Commons Pro es una fuente de pago (TypeType) sin CDN público.
+   Se referencia como local() para usar la fuente si está instalada en el equipo;
+   si no, cae a Inter (ya importada arriba) sin romper el layout.
+   Para producción: agregar el archivo .woff2 con licencia y un @font-face con src: url(). */
+@font-face {
+  font-family: 'TT Commons Pro';
+  src: local('TT Commons Pro Bold'), local('TTCommonsPro-Bold');
+  font-weight: 700;
+}
+
+@theme inline {
+  --color-sidebar: #342C50;
+  --color-sidebar-dark: #2A2340;
+  --color-sidebar-hover: #625A7E;
+  --color-sidebar-active: #403662;
+  --color-sidebar-text: #B3AFC0;
+  --color-sidebar-text-active: #FFFFFF;
+
+  --color-bg: #F7F7FA;
+  --color-surface: #FFFFFF;
+  --color-beige: #F5F1EB;
+  --color-beige-dark: #E6E3DD;
+
+  --color-purple: #403662;
+  --color-purple-light: #89829E;
+  --color-purple-pale: #E8E7EC;
+  --color-purple-dark: #342C50;
+
+  --color-success: #22C55E;
+  --color-warn: #BE8156;
+  --color-danger: #EF4444;
+  --color-info: #6F828A;
+
+  --color-text: #1A1A2E;
+  --color-muted: #6B7280;
+  --color-border: #E5E7EB;
+
+  --font-sans: 'TT Commons Pro', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html, body, #root {
+  height: 100%;
+  background: #F7F7FA;
+  color: #1A1A2E;
+  font-family: 'TT Commons Pro', 'Inter', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #C2BFCD; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #89829E; }
