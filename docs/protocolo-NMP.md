@@ -71,6 +71,7 @@ TIPO|ID|NODE_ID|DATOS
 Si las credenciales LDAP son incorrectas, el cliente no tiene acceso a las funciones de consulta.
 
 ## Ejemplo de funcionamiento
+```
 NODO SERVIDOR CLIENTE
 │──── REGISTER ───────────►│ │
 │◄──── ACK ─────────────────│ │
@@ -80,8 +81,7 @@ NODO SERVIDOR CLIENTE
 │◄──── ACK ─────────────────│ │
 │ │◄──── QUERY ─────────────│
 │ │──── RESPONSE ──────────►│
-
-
+```
 ## Manejo de errores
 
 | Situación | Respuesta / comportamiento |
