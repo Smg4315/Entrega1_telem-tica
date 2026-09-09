@@ -1,4 +1,4 @@
-HEAD
+
 # NetMonitor
 
 Sistema distribuido de monitoreo de infraestructura — Telemática, Fase 1.
