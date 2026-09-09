@@ -1,3 +1,4 @@
+HEAD
 # NetMonitor
 
 Sistema distribuido de monitoreo de infraestructura — Telemática, Fase 1.
@@ -22,3 +23,4 @@ Sistema distribuido de monitoreo de infraestructura — Telemática, Fase 1.
 ```
 
 `server/` no sabe que existe un navegador: para él, `gateway/` es simplemente otro cliente NMP.
+
