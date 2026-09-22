@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "../../include/msg_io.h"
 
 #define TCP_BACKLOG 10
 #define TCP_BUF_SIZE 512
@@ -68,9 +69,19 @@ void run_tcp_accept_loop(int server_fd) {
             continue;
         }
 
-        ssize_t n = read(client_fd, buf, sizeof(buf));
-        if (n > 0) {
-            handle_tcp_message(client_fd, buf, (size_t)n);
+        /* Una conexión puede traer varios mensajes seguidos hasta que el
+         * cliente haga FIN (n==0) o ocurra un error real (n==-1). */
+        for (;;) {
+            ssize_t n = recv_message(client_fd, buf, sizeof(buf));
+            if (n > 0) {
+                handle_tcp_message(client_fd, buf, (size_t)n);
+                continue;
+            }
+            if (n == 0) {
+                break; /* el cliente cerró su lado de escritura */
+            }
+            perror("recv_message");
+            break; /* error real: cerrar esta conexión sin tumbar el servidor */
         }
 
         close(client_fd);
