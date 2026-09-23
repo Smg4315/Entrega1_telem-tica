@@ -7,7 +7,8 @@
 static void test_register(void) {
     nmp_message_t request = {
         .type = NMP_REGISTER,
-        .id = 1
+        .id = 1,
+        .id_raw = "001"
     };
 
     strcpy(request.node_id, "NODE01");
@@ -22,13 +23,14 @@ static void test_register(void) {
     assert(strcmp(response.data, "REGISTER") == 0);
 
     assert(nmp_serialize_response(&response, buffer, sizeof(buffer)) == 0);
-    assert(strcmp(buffer, "ACK|1|NODE01|REGISTER") == 0);
+    assert(strcmp(buffer, "ACK|001|REGISTER|NODE01") == 0);
 }
 
 static void test_status(void) {
     nmp_message_t request = {
         .type = NMP_STATUS,
-        .id = 2
+        .id = 2,
+        .id_raw = "002"
     };
 
     strcpy(request.node_id, "NODE01");
@@ -46,7 +48,8 @@ static void test_status(void) {
 static void test_event(void) {
     nmp_message_t request = {
         .type = NMP_EVENT,
-        .id = 3
+        .id = 3,
+        .id_raw = "003"
     };
 
     strcpy(request.node_id, "NODE01");
@@ -63,7 +66,8 @@ static void test_event(void) {
 static void test_query(void) {
     nmp_message_t request = {
         .type = NMP_QUERY,
-        .id = 101
+        .id = 101,
+        .id_raw = "101"
     };
 
     strcpy(request.node_id, "NODE01");
@@ -85,16 +89,43 @@ static void test_query(void) {
 static void test_invalid_message(void) {
     nmp_message_t request = {
         .type = NMP_ACK,
-        .id = 50
+        .id = 50,
+        .id_raw = "050"
     };
 
     strcpy(request.node_id, "NODE01");
 
     nmp_message_t response;
+    char buffer[512];
 
     assert(nmp_build_response(&request, &response) == 0);
     assert(response.type == NMP_ERROR);
     assert(strcmp(response.data, "INVALID_MESSAGE") == 0);
+
+    assert(nmp_serialize_response(&response, buffer, sizeof(buffer)) == 0);
+    assert(strcmp(buffer, "ERROR|050|INVALID_MESSAGE|NODE01") == 0);
+}
+
+static void test_invalid_format_error(void) {
+    nmp_message_t response;
+    char buffer[512];
+
+    nmp_build_error(NULL, "INVALID_FORMAT", &response);
+
+    assert(nmp_serialize_response(&response, buffer, sizeof(buffer)) == 0);
+    assert(strcmp(buffer, "ERROR|0|INVALID_FORMAT|") == 0);
+}
+
+static void test_parse_to_ack_preserves_id(void) {
+    nmp_message_t request;
+    nmp_message_t response;
+    char buffer[512];
+
+    assert(nmp_parse("STATUS|002|NODE01|CPU=45|MEM=62", &request) == 0);
+    assert(nmp_build_response(&request, &response) == 0);
+
+    assert(nmp_serialize_response(&response, buffer, sizeof(buffer)) == 0);
+    assert(strcmp(buffer, "ACK|002|STATUS|NODE01") == 0);
 }
 
 static void test_invalid_arguments(void) {
@@ -111,6 +142,8 @@ int main(void) {
     test_event();
     test_query();
     test_invalid_message();
+    test_invalid_format_error();
+    test_parse_to_ack_preserves_id();
     test_invalid_arguments();
 
     printf("Todos los tests de nmp_response pasaron correctamente.\n");

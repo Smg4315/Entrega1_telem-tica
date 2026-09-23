@@ -108,6 +108,10 @@ int nmp_parse(const char *raw, nmp_message_t *out) {
     if (nmp_parse_id(first_sep + 1, &out->id) != 0) {
         return -1;
     }
+    if (strlen(first_sep + 1) >= sizeof(out->id_raw)) {
+        return -1;
+    }
+    strcpy(out->id_raw, first_sep + 1);
 
     payload_start = second_sep + 1;
     third_sep = strchr(payload_start, '|');

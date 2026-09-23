@@ -14,6 +14,8 @@ int nmp_build_response(
     memset(response, 0, sizeof(*response));
 
     response->id = request->id;
+    strncpy(response->id_raw, request->id_raw,
+            sizeof(response->id_raw) - 1);
     strncpy(response->node_id, request->node_id,
             sizeof(response->node_id) - 1);
     response->node_id[sizeof(response->node_id) - 1] = '\0';
@@ -47,9 +49,7 @@ int nmp_build_response(
         case NMP_ACK:
         case NMP_RESPONSE:
         case NMP_ERROR:
-            response->type = NMP_ERROR;
-            strncpy(response->data, "INVALID_MESSAGE",
-                    sizeof(response->data) - 1);
+            nmp_build_error(request, "INVALID_MESSAGE", response);
             break;
 
         default:
@@ -59,6 +59,29 @@ int nmp_build_response(
     response->data[sizeof(response->data) - 1] = '\0';
 
     return 0;
+}
+
+void nmp_build_error(
+    const nmp_message_t *request,
+    const char *code,
+    nmp_message_t *response
+) {
+    if (response == NULL || code == NULL) {
+        return;
+    }
+
+    memset(response, 0, sizeof(*response));
+    response->type = NMP_ERROR;
+
+    if (request != NULL) {
+        response->id = request->id;
+        strncpy(response->id_raw, request->id_raw,
+                sizeof(response->id_raw) - 1);
+        strncpy(response->node_id, request->node_id,
+                sizeof(response->node_id) - 1);
+    }
+
+    strncpy(response->data, code, sizeof(response->data) - 1);
 }
 
 static const char *nmp_type_to_string(nmp_msg_type_t type) {
@@ -80,6 +103,8 @@ int nmp_serialize_response(
     size_t out_len
 ) {
     const char *type;
+    char id_buf[16];
+    const char *id;
     int written;
 
     if (message == NULL || out == NULL || out_len == 0) {
@@ -92,15 +117,21 @@ int nmp_serialize_response(
         return -1;
     }
 
-    written = snprintf(
-        out,
-        out_len,
-        "%s|%u|%s|%s",
-        type,
-        message->id,
-        message->node_id,
-        message->data
-    );
+    if (message->id_raw[0] != '\0') {
+        id = message->id_raw;
+    } else {
+        snprintf(id_buf, sizeof(id_buf), "%u", message->id);
+        id = id_buf;
+    }
+
+    if (message->type == NMP_ACK || message->type == NMP_ERROR) {
+        /* Spec: ACK|001|REGISTER|NODE01, ERROR|101|UNKNOWN_NODE|NODE99 */
+        written = snprintf(out, out_len, "%s|%s|%s|%s",
+                           type, id, message->data, message->node_id);
+    } else {
+        written = snprintf(out, out_len, "%s|%s|%s|%s",
+                           type, id, message->node_id, message->data);
+    }
 
     if (written < 0 || (size_t)written >= out_len) {
         return -1;

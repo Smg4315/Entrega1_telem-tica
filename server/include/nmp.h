@@ -18,6 +18,7 @@ typedef enum {
 typedef struct {
     nmp_msg_type_t type;
     unsigned int    id;
+    char            id_raw[16];   /* ID tal como llegó (conserva ceros: "001") */
     char            node_id[32];
     char            data[256];
 } nmp_message_t;
