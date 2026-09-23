@@ -12,6 +12,8 @@
 #include "../../include/msg_io.h"
 #include "../../include/nmp.h"
 #include "../../include/nmp_response.h"
+#include "../../include/node_registry.h"
+#include "../../include/state_manager.h"
 
 #define TCP_BACKLOG 10
 #define TCP_BUF_SIZE 512
@@ -24,33 +26,19 @@ void handle_tcp_message(int client_fd, const char *raw, size_t len) {
     (void)len;
 
     if (nmp_parse(raw, &request) != 0) {
-        snprintf(
-            response_buffer,
-            sizeof(response_buffer),
-            "ERROR|0||INVALID_FORMAT"
-        );
-
-        if (send_message(client_fd, response_buffer) < 0) {
-            perror("send_message");
+        nmp_build_error(NULL, "INVALID_FORMAT", &response);
+    } else if (request.type != NMP_REGISTER && !is_node_registered(request.node_id)) {
+        nmp_build_error(&request, "UNKNOWN_NODE", &response);
+    } else {
+        if (request.type == NMP_REGISTER) {
+            register_node(request.node_id);
+        } else if (request.type == NMP_STATUS || request.type == NMP_EVENT) {
+            update_node_state(request.node_id, request.data);
         }
 
-        return;
-    }
-
-    if (nmp_build_response(&request, &response) != 0) {
-        snprintf(
-            response_buffer,
-            sizeof(response_buffer),
-            "ERROR|%u|%s|INVALID_MESSAGE",
-            request.id,
-            request.node_id
-        );
-
-        if (send_message(client_fd, response_buffer) < 0) {
-            perror("send_message");
+        if (nmp_build_response(&request, &response) != 0) {
+            nmp_build_error(&request, "INVALID_MESSAGE", &response);
         }
-
-        return;
     }
 
     if (nmp_serialize_response(

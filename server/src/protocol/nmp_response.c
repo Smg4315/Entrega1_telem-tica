@@ -1,4 +1,5 @@
 #include "../../include/nmp_response.h"
+#include "../../include/state_manager.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -40,11 +41,29 @@ int nmp_build_response(
                     sizeof(response->data) - 1);
             break;
 
-        case NMP_QUERY:
+        case NMP_QUERY: {
+            /* Solo estado actual; HISTORY queda fuera de Fase 2. */
+            if (strcmp(request->data, "CURRENT") != 0) {
+                nmp_build_error(request, "INVALID_PARAMETER", response);
+                break;
+            }
+
+            const char *state = get_node_state(request->node_id);
+            int written;
+
             response->type = NMP_RESPONSE;
-            strncpy(response->data, request->data,
-                    sizeof(response->data) - 1);
+            if (state == NULL || state[0] == '\0') {
+                written = snprintf(response->data, sizeof(response->data),
+                                   "CURRENT");
+            } else {
+                written = snprintf(response->data, sizeof(response->data),
+                                   "CURRENT|%s", state);
+            }
+            if (written < 0 || (size_t)written >= sizeof(response->data)) {
+                return -1;
+            }
             break;
+        }
 
         case NMP_ACK:
         case NMP_RESPONSE:

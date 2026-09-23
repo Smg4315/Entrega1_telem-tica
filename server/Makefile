@@ -11,8 +11,8 @@ SRC  = $(wildcard src/*.c src/*/*.c)
 OBJ  = $(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRC))
 HDR  = $(wildcard include/*.h)
 
-# Las pruebas enlazan solo el módulo de protocolo (sin sockets ni main.c).
-PROTOCOL_SRC = $(wildcard src/protocol/*.c)
+# Las pruebas enlazan protocolo + estado en memoria (sin sockets ni main.c).
+PROTOCOL_SRC = $(wildcard src/protocol/*.c) src/core/node_registry.c src/core/state_manager.c
 TEST_SRC     = $(wildcard tests/test_nmp_*.c)
 TEST_BIN     = $(patsubst tests/%.c,$(BIN_DIR)/%,$(TEST_SRC))
 
@@ -29,7 +29,7 @@ $(OBJ_DIR)/%.o: src/%.c $(HDR)
 
 $(BIN_DIR)/test_%: tests/test_%.c $(PROTOCOL_SRC) $(HDR)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDFLAGS)
 
 test: $(TEST_BIN)
 	@for t in $(TEST_BIN); do echo "== $$t"; ./$$t || exit 1; done

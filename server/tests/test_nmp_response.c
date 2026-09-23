@@ -1,4 +1,6 @@
 #include "../include/nmp_response.h"
+#include "../include/node_registry.h"
+#include "../include/state_manager.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -86,6 +88,41 @@ static void test_query(void) {
     assert(strcmp(buffer, "RESPONSE|101|NODE01|CURRENT") == 0);
 }
 
+static void test_query_with_state(void) {
+    nmp_message_t request;
+    nmp_message_t response;
+    char buffer[512];
+
+    update_node_state("NODE02", "CPU=45|MEM=62|TEMP=38|BAT=87");
+    update_node_state("NODE02", "HIGH_TEMP|TEMP=92");
+
+    assert(nmp_parse("QUERY|101|NODE02|CURRENT", &request) == 0);
+    assert(nmp_build_response(&request, &response) == 0);
+
+    assert(nmp_serialize_response(&response, buffer, sizeof(buffer)) == 0);
+    assert(strcmp(buffer, "RESPONSE|101|NODE02|CURRENT|CPU=45|MEM=62|TEMP=92|BAT=87") == 0);
+}
+
+static void test_query_invalid_parameter(void) {
+    nmp_message_t request;
+    nmp_message_t response;
+    char buffer[512];
+
+    assert(nmp_parse("QUERY|102|NODE02|HISTORY", &request) == 0);
+    assert(nmp_build_response(&request, &response) == 0);
+
+    assert(nmp_serialize_response(&response, buffer, sizeof(buffer)) == 0);
+    assert(strcmp(buffer, "ERROR|102|INVALID_PARAMETER|NODE02") == 0);
+}
+
+static void test_node_registry(void) {
+    assert(!is_node_registered("NODE03"));
+    register_node("NODE03");
+    register_node("NODE03");
+    assert(is_node_registered("NODE03"));
+    assert(!is_node_registered("NODE99"));
+}
+
 static void test_invalid_message(void) {
     nmp_message_t request = {
         .type = NMP_ACK,
@@ -141,6 +178,9 @@ int main(void) {
     test_status();
     test_event();
     test_query();
+    test_query_with_state();
+    test_query_invalid_parameter();
+    test_node_registry();
     test_invalid_message();
     test_invalid_format_error();
     test_parse_to_ack_preserves_id();

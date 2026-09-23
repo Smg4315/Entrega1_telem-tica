@@ -11,6 +11,8 @@
 #include <arpa/inet.h>
 #include "../../include/nmp.h"
 #include "../../include/nmp_response.h"
+#include "../../include/node_registry.h"
+#include "../../include/state_manager.h"
 
 #define UDP_BUF_SIZE 512
 
@@ -47,8 +49,17 @@ void handle_udp_message(int sockfd, struct sockaddr_in *sender, const char *raw,
 
     if (nmp_parse(text, &request) != 0) {
         nmp_build_error(NULL, "INVALID_FORMAT", &response);
-    } else if (nmp_build_response(&request, &response) != 0) {
+    } else if (request.type != NMP_STATUS) {
+        /* Por UDP solo viaja STATUS (y su ACK de vuelta) — docx, sección 9. */
         nmp_build_error(&request, "INVALID_MESSAGE", &response);
+    } else if (!is_node_registered(request.node_id)) {
+        nmp_build_error(&request, "UNKNOWN_NODE", &response);
+    } else {
+        update_node_state(request.node_id, request.data);
+
+        if (nmp_build_response(&request, &response) != 0) {
+            nmp_build_error(&request, "INVALID_MESSAGE", &response);
+        }
     }
 
     send_udp_response(sockfd, sender, &response);
