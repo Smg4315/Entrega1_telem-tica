@@ -103,7 +103,7 @@ void nmp_build_error(
     strncpy(response->data, code, sizeof(response->data) - 1);
 }
 
-static const char *nmp_type_to_string(nmp_msg_type_t type) {
+const char *nmp_type_to_string(nmp_msg_type_t type) {
     switch (type) {
         case NMP_REGISTER: return "REGISTER";
         case NMP_STATUS:   return "STATUS";

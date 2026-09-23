@@ -1,6 +1,6 @@
 # Build del servidor NMP y de las pruebas unitarias (requiere entorno POSIX: Linux/WSL).
 CC      = gcc
-CFLAGS  = -Wall -Wextra -std=c11 -D_POSIX_C_SOURCE=200809L -Iinclude
+CFLAGS  = -Wall -Wextra -std=c11 -D_DEFAULT_SOURCE -Iinclude
 LDFLAGS = -pthread
 
 BIN_DIR = bin

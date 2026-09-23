@@ -1,10 +1,13 @@
 /* Estado actual por nodo (docx, sección 6 — Máquinas de Estado).
- * Solo el último valor de cada métrica; el histórico queda fuera de Fase 2. */
+ * Solo el último valor de cada métrica; el histórico queda fuera de Fase 2.
+ * Los datos viven en memoria compartida (mmap MAP_SHARED) para que el padre,
+ * el hilo UDP y los hijos TCP creados con fork() vean el mismo estado. */
 #include "../../include/state_manager.h"
 
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 
 #define MAX_NODES     64
 #define NODE_ID_LEN   32
@@ -24,15 +27,44 @@ typedef struct {
     int      metric_count;
 } node_state_t;
 
-static node_state_t states[MAX_NODES];
-static int state_count = 0;
-static pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
+typedef struct {
+    pthread_mutex_t lock; /* PTHREAD_PROCESS_SHARED */
+    int             count;
+    node_state_t    nodes[MAX_NODES];
+} state_table_t;
 
-/* Requiere state_lock tomado. */
+static state_table_t *tbl = NULL;
+static pthread_once_t tbl_once = PTHREAD_ONCE_INIT;
+
+static void state_table_create(void) {
+    void *mem = mmap(NULL, sizeof(state_table_t), PROT_READ | PROT_WRITE,
+                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) {
+        perror("state_manager: mmap");
+        return;
+    }
+
+    state_table_t *t = mem;
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&t->lock, &attr);
+    pthread_mutexattr_destroy(&attr);
+    t->count = 0;
+
+    tbl = t;
+}
+
+int state_manager_init(void) {
+    pthread_once(&tbl_once, state_table_create);
+    return (tbl != NULL) ? 0 : -1;
+}
+
+/* Requiere tbl->lock tomado. */
 static node_state_t *find_state(const char *node_id) {
-    for (int i = 0; i < state_count; ++i) {
-        if (strcmp(states[i].node_id, node_id) == 0) {
-            return &states[i];
+    for (int i = 0; i < tbl->count; ++i) {
+        if (strcmp(tbl->nodes[i].node_id, node_id) == 0) {
+            return &tbl->nodes[i];
         }
     }
     return NULL;
@@ -66,20 +98,21 @@ static void set_metric(node_state_t *st, const char *key, size_t key_len,
 }
 
 void update_node_state(const char *node_id, const char *data) {
-    if (node_id == NULL || node_id[0] == '\0' || strlen(node_id) >= NODE_ID_LEN) {
+    if (node_id == NULL || node_id[0] == '\0' || strlen(node_id) >= NODE_ID_LEN ||
+        state_manager_init() != 0) {
         return;
     }
 
-    pthread_mutex_lock(&state_lock);
+    pthread_mutex_lock(&tbl->lock);
 
     node_state_t *st = find_state(node_id);
     if (st == NULL) {
-        if (state_count >= MAX_NODES) {
-            pthread_mutex_unlock(&state_lock);
+        if (tbl->count >= MAX_NODES) {
+            pthread_mutex_unlock(&tbl->lock);
             fprintf(stderr, "state_manager: lleno, no se guardó estado de %s\n", node_id);
             return;
         }
-        st = &states[state_count++];
+        st = &tbl->nodes[tbl->count++];
         memset(st, 0, sizeof(*st));
         strcpy(st->node_id, node_id);
     }
@@ -101,21 +134,21 @@ void update_node_state(const char *node_id, const char *data) {
         }
     }
 
-    pthread_mutex_unlock(&state_lock);
+    pthread_mutex_unlock(&tbl->lock);
 }
 
 const char *get_node_state(const char *node_id) {
     static _Thread_local char out[STATE_STR_LEN];
 
-    if (node_id == NULL) {
+    if (node_id == NULL || state_manager_init() != 0) {
         return NULL;
     }
 
-    pthread_mutex_lock(&state_lock);
+    pthread_mutex_lock(&tbl->lock);
 
     node_state_t *st = find_state(node_id);
     if (st == NULL) {
-        pthread_mutex_unlock(&state_lock);
+        pthread_mutex_unlock(&tbl->lock);
         return NULL;
     }
 
@@ -131,6 +164,6 @@ const char *get_node_state(const char *node_id) {
     }
     out[used] = '\0';
 
-    pthread_mutex_unlock(&state_lock);
+    pthread_mutex_unlock(&tbl->lock);
     return out;
 }

@@ -13,6 +13,7 @@
 #include "../../include/nmp_response.h"
 #include "../../include/node_registry.h"
 #include "../../include/state_manager.h"
+#include "../../include/logger.h"
 
 #define UDP_BUF_SIZE 512
 
@@ -47,7 +48,9 @@ void handle_udp_message(int sockfd, struct sockaddr_in *sender, const char *raw,
     }
     text[len] = '\0';
 
-    if (nmp_parse(text, &request) != 0) {
+    int parsed = (nmp_parse(text, &request) == 0);
+
+    if (!parsed) {
         nmp_build_error(NULL, "INVALID_FORMAT", &response);
     } else if (request.type != NMP_STATUS) {
         /* Por UDP solo viaja STATUS (y su ACK de vuelta) — docx, sección 9. */
@@ -63,6 +66,14 @@ void handle_udp_message(int sockfd, struct sockaddr_in *sender, const char *raw,
     }
 
     send_udp_response(sockfd, sender, &response);
+
+    char logged[UDP_BUF_SIZE];
+    if (nmp_serialize_response(&response, logged, sizeof(logged)) != 0) {
+        snprintf(logged, sizeof(logged), "SERIALIZE_ERROR");
+    }
+    log_request(parsed ? request.node_id : NULL,
+                parsed ? nmp_type_to_string(request.type) : "INVALID",
+                logged);
 }
 
 int start_udp_server(int port) {
