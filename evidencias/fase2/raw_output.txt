@@ -1,0 +1,65 @@
+NetMonitor — Fase 2: evidencia de comunicación cliente/servidor
+Fecha: 2026-09-23 14:42:47
+Servidor: server/bin/server 8080 (TCP y UDP en el puerto 8080)
+Cliente:  server/client_test.py
+
+==================================================================
+CASO 1 — REGISTER por TCP (nodo nuevo)
+$ python3 client_test.py tcp "REGISTER|001|NODE01"
+------------------------------------------------------------------
+Conectado al servidor (TCP).
+Enviado  (raw): b'REGISTER|001|NODE01\n'
+Recibido (raw): b'ACK|001|REGISTER|NODE01\n'
+Respuesta del servidor:
+ACK|001|REGISTER|NODE01
+
+==================================================================
+CASO 2 — STATUS por UDP
+$ python3 client_test.py udp "STATUS|002|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87"
+------------------------------------------------------------------
+Enviando datagrama al servidor (UDP).
+Enviado  (raw): b'STATUS|002|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87'
+Recibido (raw): b'ACK|002|STATUS|NODE01'
+Respuesta del servidor:
+ACK|002|STATUS|NODE01
+
+==================================================================
+CASO 3 — EVENT por TCP
+$ python3 client_test.py tcp "EVENT|003|NODE01|HIGH_TEMP|TEMP=92"
+------------------------------------------------------------------
+Conectado al servidor (TCP).
+Enviado  (raw): b'EVENT|003|NODE01|HIGH_TEMP|TEMP=92\n'
+Recibido (raw): b'ACK|003|EVENT|NODE01\n'
+Respuesta del servidor:
+ACK|003|EVENT|NODE01
+
+==================================================================
+CASO 4 — QUERY por TCP (nodo registrado)
+$ python3 client_test.py tcp "QUERY|101|NODE01|CURRENT"
+------------------------------------------------------------------
+Conectado al servidor (TCP).
+Enviado  (raw): b'QUERY|101|NODE01|CURRENT\n'
+Recibido (raw): b'RESPONSE|101|NODE01|CURRENT|CPU=45|MEM=62|TEMP=92|BAT=87\n'
+Respuesta del servidor:
+RESPONSE|101|NODE01|CURRENT|CPU=45|MEM=62|TEMP=92|BAT=87
+
+==================================================================
+CASO 5 — QUERY por TCP (nodo NO registrado)
+$ python3 client_test.py tcp "QUERY|101|NODE99|CURRENT"
+------------------------------------------------------------------
+Conectado al servidor (TCP).
+Enviado  (raw): b'QUERY|101|NODE99|CURRENT\n'
+Recibido (raw): b'ERROR|101|UNKNOWN_NODE|NODE99\n'
+Respuesta del servidor:
+ERROR|101|UNKNOWN_NODE|NODE99
+
+==================================================================
+CASO 6 — REGISTER por UDP (transporte incorrecto)
+$ python3 client_test.py udp "REGISTER|004|NODE01"
+------------------------------------------------------------------
+Enviando datagrama al servidor (UDP).
+Enviado  (raw): b'REGISTER|004|NODE01'
+Recibido (raw): b'ERROR|004|INVALID_MESSAGE|NODE01'
+Respuesta del servidor:
+ERROR|004|INVALID_MESSAGE|NODE01
+
