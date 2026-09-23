@@ -10,15 +10,61 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "../../include/msg_io.h"
+#include "../../include/nmp.h"
+#include "../../include/nmp_response.h"
 
 #define TCP_BACKLOG 10
 #define TCP_BUF_SIZE 512
 
-/* TODO: pertenece al módulo de parsing (src/protocol/nmp_parser.c). */
 void handle_tcp_message(int client_fd, const char *raw, size_t len) {
-    (void)client_fd;
-    (void)raw;
+    nmp_message_t request;
+    nmp_message_t response;
+    char response_buffer[TCP_BUF_SIZE];
+
     (void)len;
+
+    if (nmp_parse(raw, &request) != 0) {
+        snprintf(
+            response_buffer,
+            sizeof(response_buffer),
+            "ERROR|0||INVALID_FORMAT"
+        );
+
+        if (send_message(client_fd, response_buffer) < 0) {
+            perror("send_message");
+        }
+
+        return;
+    }
+
+    if (nmp_build_response(&request, &response) != 0) {
+        snprintf(
+            response_buffer,
+            sizeof(response_buffer),
+            "ERROR|%u|%s|INVALID_MESSAGE",
+            request.id,
+            request.node_id
+        );
+
+        if (send_message(client_fd, response_buffer) < 0) {
+            perror("send_message");
+        }
+
+        return;
+    }
+
+    if (nmp_serialize_response(
+            &response,
+            response_buffer,
+            sizeof(response_buffer)) != 0) {
+
+        fprintf(stderr, "Error serializando respuesta NMP\n");
+        return;
+    }
+
+    if (send_message(client_fd, response_buffer) < 0) {
+        perror("send_message");
+    }
 }
 
 int start_tcp_server(int port) {
