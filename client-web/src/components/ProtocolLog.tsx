@@ -1,6 +1,6 @@
-import { mockProtocolLog } from "../data/mockData";
+import type { LogEntry } from "../data/types";
 
-export default function ProtocolLog() {
+export default function ProtocolLog({ entries }: { entries: LogEntry[] }) {
   return (
     <div className="flex flex-col h-full bg-white" style={{ borderLeft: "1px solid #E5E7EB" }}>
       <div className="px-4 py-4 shrink-0" style={{ borderBottom: "1px solid #E5E7EB" }}>
@@ -9,7 +9,10 @@ export default function ProtocolLog() {
       </div>
 
       <div className="flex-1 overflow-auto p-3 flex flex-col gap-1.5">
-        {mockProtocolLog.map((entry, i) => {
+        {entries.length === 0 && (
+          <div className="text-xs px-1 py-2" style={{ color: "#9CA3AF" }}>Sin mensajes todavía</div>
+        )}
+        {entries.map((entry, i) => {
           const isSend = entry.dir === "→";
           const isError = entry.msg.startsWith("ERROR");
           const isEvent = entry.msg.includes("|EVENT|") || entry.msg.includes("DISCONNECT");

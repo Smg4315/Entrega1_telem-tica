@@ -2,7 +2,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import type { MonitoredNode } from "../data/mockData";
+import type { MonitoredNode } from "../data/types";
 import StatusBadge from "./StatusBadge";
 import MetricGauge from "./MetricGauge";
 
@@ -20,7 +20,13 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function NodeCard({ node, onSelect }: { node: MonitoredNode; onSelect: () => void }) {
-  const isDown = node.status === "disconnected";
+  // Sin lectura vigente: se muestra un aviso en lugar de las métricas.
+  const notice =
+    node.status === "error" ? { text: node.error ?? "Error al consultar el nodo", bg: "#FFFBEB", color: "#B45309" }
+    : node.status === "disconnected" ? { text: "Nodo sin respuesta — desconectado", bg: "#FEF2F2", color: "#EF4444" }
+    : node.status === "loading" ? { text: "Consultando…", bg: "#F3F4F6", color: "#6B7280" }
+    : null;
+  const isDown = notice !== null;
 
   return (
     <button
@@ -68,9 +74,9 @@ function NodeCard({ node, onSelect }: { node: MonitoredNode; onSelect: () => voi
         </div>
       )}
 
-      {isDown ? (
-        <div className="py-4 text-center text-xs rounded-lg" style={{ background: "#FEF2F2", color: "#EF4444" }}>
-          Nodo sin respuesta — desconectado
+      {notice ? (
+        <div className="py-4 px-3 text-center text-xs rounded-lg" style={{ background: notice.bg, color: notice.color }}>
+          {notice.text}
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -81,7 +87,7 @@ function NodeCard({ node, onSelect }: { node: MonitoredNode; onSelect: () => voi
       )}
 
       <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
-        <span className="text-xs" style={{ color: "#9CA3AF" }}>Señal: {node.lastSeen}</span>
+        <span className="text-xs" style={{ color: "#9CA3AF" }}>Última respuesta: {node.lastSeen}</span>
         <span className="text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "#403662" }}>
           Ver detalle →
         </span>
@@ -95,16 +101,19 @@ export default function Dashboard({ nodes, onSelectNode, user }: Props) {
   const disconnected = nodes.filter(n => n.status === "disconnected").length;
   const events = nodes.reduce((acc, n) => acc + n.events.length, 0);
 
-  // Aggregate CPU history across all nodes (avg)
-  const cpuTrend = nodes[0]?.history.map((h, i) => ({
-    timestamp: h.timestamp,
-    avg: Math.round(nodes.filter(n => n.status !== "disconnected").reduce((s, n) => s + n.history[i]?.cpu, 0) / active),
-  })) ?? [];
+  // Aggregate CPU history across all nodes (avg); null si ningún nodo tiene lectura
+  const cpuTrend = nodes[0]?.history.map((h, i) => {
+    const values = nodes.map(n => n.history[i]?.cpu).filter((v): v is number => typeof v === "number");
+    return {
+      timestamp: h.timestamp,
+      avg: values.length > 0 ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : null,
+    };
+  }) ?? [];
 
   const statusDist = [
     { label: "Activo", count: nodes.filter(n => n.status === "active").length, color: "#22C55E" },
-    { label: "Enviando", count: nodes.filter(n => n.status === "sending").length, color: "#6F828A" },
     { label: "Desconectado", count: nodes.filter(n => n.status === "disconnected").length, color: "#EF4444" },
+    { label: "Error", count: nodes.filter(n => n.status === "error").length, color: "#BE8156" },
   ];
 
   return (
@@ -122,7 +131,7 @@ export default function Dashboard({ nodes, onSelectNode, user }: Props) {
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Nodos totales", value: nodes.length, sub: "registrados", color: "#403662", bg: "#E8E7EC" },
+          { label: "Nodos totales", value: nodes.length, sub: "configurados", color: "#403662", bg: "#E8E7EC" },
           { label: "En línea", value: active, sub: "activos / enviando", color: "#15803D", bg: "#F0FDF4" },
           { label: "Desconectados", value: disconnected, sub: "sin respuesta", color: "#B91C1C", bg: "#FEF2F2" },
           { label: "Eventos activos", value: events, sub: "requieren atención", color: "#B45309", bg: "#FFFBEB" },

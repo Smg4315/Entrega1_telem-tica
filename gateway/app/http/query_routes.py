@@ -25,8 +25,11 @@ _NODE_ID_RE = re.compile(r"[A-Za-z0-9_.-]{1,31}")
 _HTTP_STATUS = {"UNKNOWN_NODE": 404}
 
 
-def _error(status: int, code: str, node_id: str) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"error": code, "nodeId": node_id})
+def _error(status: int, code: str, node_id: str, nmp: dict | None = None) -> JSONResponse:
+    content = {"error": code, "nodeId": node_id}
+    if nmp is not None:
+        content["nmp"] = nmp
+    return JSONResponse(status_code=status, content=content)
 
 
 # def (no async): los sockets son bloqueantes y FastAPI ejecuta esta función
@@ -45,19 +48,22 @@ def historico(node_id: str):
             raw = send_nmp(conn, request)
     except OSError:
         # Incluye conexión rechazada, timeout, fallo de DNS y cierre prematuro.
-        return _error(502, "SERVER_UNREACHABLE", node_id)
+        return _error(502, "SERVER_UNREACHABLE", node_id, {"request": request})
+
+    # Intercambio NMP textual, para que el front lo muestre en su log.
+    nmp = {"request": request, "reply": raw}
 
     try:
         reply = parse_nmp(raw)
     except ValueError:
-        return _error(502, "INVALID_REPLY", node_id)
+        return _error(502, "INVALID_REPLY", node_id, nmp)
 
     if reply.type == "ERROR":
         # reply.data es el código: UNKNOWN_NODE, INVALID_MESSAGE, INVALID_PARAMETER...
-        return _error(_HTTP_STATUS.get(reply.data, 400), reply.data, node_id)
+        return _error(_HTTP_STATUS.get(reply.data, 400), reply.data, node_id, nmp)
 
     if reply.type != "RESPONSE":
-        return _error(502, "INVALID_REPLY", node_id)
+        return _error(502, "INVALID_REPLY", node_id, nmp)
 
     # DATOS: CURRENT|CPU=45|MEM=62|...[|DESCONECTADO]
     metrics = {}
@@ -73,4 +79,5 @@ def historico(node_id: str):
         "nodeId": reply.node_id,
         "status": "active" if connected else "disconnected",
         "metrics": metrics,
+        "nmp": nmp,
     }

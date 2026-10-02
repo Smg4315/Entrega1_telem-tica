@@ -1,7 +1,7 @@
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import type { MonitoredNode, NodeEvent } from "../data/mockData";
+import type { MonitoredNode, NodeEvent } from "../data/types";
 import StatusBadge from "./StatusBadge";
 
 const EVENT_STYLE: Record<NodeEvent["type"], { color: string; bg: string; label: string }> = {
@@ -59,7 +59,9 @@ interface Props {
 
 export default function NodeDetail({ node, onBack }: Props) {
   const last5 = node.history.slice(-5);
-  const isDown = node.status === "disconnected";
+  // Sin lectura vigente: desconectado, con error o aún consultando.
+  const isDown = node.status !== "active" && node.status !== "sending";
+  const show = (v: number | null, unit: string) => (v === null ? "--" : `${v}${unit}`);
 
   return (
     <div className="p-6 flex flex-col gap-6 overflow-auto h-full">
@@ -79,11 +81,17 @@ export default function NodeDetail({ node, onBack }: Props) {
           <div>
             <h1 className="text-xl font-bold" style={{ color: "#1A1A2E" }}>{node.label}</h1>
             <p className="text-xs mt-1" style={{ color: "#9CA3AF", fontFamily: "JetBrains Mono, monospace" }}>
-              {node.id} · {node.location} · Última señal: {node.lastSeen}
+              {node.id} · {node.location} · Última respuesta: {node.lastSeen}
             </p>
           </div>
           <StatusBadge status={node.status} />
         </div>
+
+        {node.status === "error" && (
+          <div className="mt-4 rounded-xl border px-5 py-4 text-sm" style={{ background: "#FFFBEB", borderColor: "#FDE68A", color: "#B45309" }}>
+            {node.error ?? "Error al consultar el nodo"}
+          </div>
+        )}
       </div>
 
       {/* Current metrics */}
@@ -94,17 +102,19 @@ export default function NodeDetail({ node, onBack }: Props) {
           { label: "Temperatura", value: node.current.temp, unit: "°C", warn: 70, danger: 85 },
           { label: "Batería", value: node.current.bat, unit: "%", warn: 30, danger: 15 },
         ].map(m => {
-          const color = isDown ? "#D1D5DB" : m.value >= m.danger ? "#EF4444" : m.value >= m.warn ? "#BE8156" : "#403662";
-          const bg = isDown ? "#F9FAFB" : m.value >= m.danger ? "#FEF2F2" : m.value >= m.warn ? "#FFFBEB" : "#E8E7EC";
+          const off = isDown || m.value === null;
+          const v = m.value ?? 0;
+          const color = off ? "#D1D5DB" : v >= m.danger ? "#EF4444" : v >= m.warn ? "#BE8156" : "#403662";
+          const bg = off ? "#F9FAFB" : v >= m.danger ? "#FEF2F2" : v >= m.warn ? "#FFFBEB" : "#E8E7EC";
           return (
             <div key={m.label} className="rounded-xl border p-5 bg-white" style={{ borderColor: "#E5E7EB" }}>
               <div className="text-3xl font-bold tabular-nums" style={{ color, fontFamily: "JetBrains Mono, monospace" }}>
-                {isDown ? "--" : `${m.value}${m.unit}`}
+                {off ? "--" : `${v}${m.unit}`}
               </div>
               <div className="text-xs font-semibold mt-2" style={{ color: "#1A1A2E" }}>{m.label}</div>
               <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: bg }}>
-                {!isDown && (
-                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, m.value)}%`, background: color }} />
+                {!off && (
+                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, v)}%`, background: color }} />
                 )}
               </div>
             </div>
@@ -114,7 +124,7 @@ export default function NodeDetail({ node, onBack }: Props) {
 
       {/* Charts */}
       <div>
-        <h2 className="text-sm font-semibold mb-3" style={{ color: "#6B7280" }}>HISTÓRICO — ÚLTIMAS 10 LECTURAS</h2>
+        <h2 className="text-sm font-semibold mb-3" style={{ color: "#6B7280" }}>HISTÓRICO — ÚLTIMAS 10 CONSULTAS DE ESTA SESIÓN</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <ChartCard title="CPU" sub="Uso del procesador" dataKey="cpu" color="#403662" data={node.history} gradId="d-cpu" />
           <ChartCard title="Memoria" sub="Uso de RAM" dataKey="mem" color="#6F828A" data={node.history} gradId="d-mem" />
@@ -139,10 +149,10 @@ export default function NodeDetail({ node, onBack }: Props) {
               {last5.map((row, i) => (
                 <tr key={i} style={{ borderBottom: i < last5.length - 1 ? "1px solid #F3F4F6" : "none" }}>
                   <td className="px-5 py-3 text-xs" style={{ color: "#9CA3AF", fontFamily: "JetBrains Mono, monospace" }}>{row.timestamp}</td>
-                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.cpu >= 90 ? "#EF4444" : row.cpu >= 75 ? "#BE8156" : "#403662", fontFamily: "JetBrains Mono, monospace" }}>{row.cpu}%</td>
-                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.mem >= 90 ? "#EF4444" : row.mem >= 75 ? "#BE8156" : "#6F828A", fontFamily: "JetBrains Mono, monospace" }}>{row.mem}%</td>
-                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.temp >= 85 ? "#EF4444" : row.temp >= 70 ? "#BE8156" : "#1A1A2E", fontFamily: "JetBrains Mono, monospace" }}>{row.temp}°C</td>
-                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.bat <= 15 ? "#EF4444" : row.bat <= 30 ? "#BE8156" : "#22C55E", fontFamily: "JetBrains Mono, monospace" }}>{row.bat}%</td>
+                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.cpu === null ? "#D1D5DB" : row.cpu >= 90 ? "#EF4444" : row.cpu >= 75 ? "#BE8156" : "#403662", fontFamily: "JetBrains Mono, monospace" }}>{show(row.cpu, "%")}</td>
+                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.mem === null ? "#D1D5DB" : row.mem >= 90 ? "#EF4444" : row.mem >= 75 ? "#BE8156" : "#6F828A", fontFamily: "JetBrains Mono, monospace" }}>{show(row.mem, "%")}</td>
+                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.temp === null ? "#D1D5DB" : row.temp >= 85 ? "#EF4444" : row.temp >= 70 ? "#BE8156" : "#1A1A2E", fontFamily: "JetBrains Mono, monospace" }}>{show(row.temp, "°C")}</td>
+                  <td className="px-5 py-3 text-xs font-semibold tabular-nums" style={{ color: row.bat === null ? "#D1D5DB" : row.bat <= 15 ? "#EF4444" : row.bat <= 30 ? "#BE8156" : "#22C55E", fontFamily: "JetBrains Mono, monospace" }}>{show(row.bat, "%")}</td>
                 </tr>
               ))}
             </tbody>

@@ -3,7 +3,8 @@ import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
 import NodeDetail from "./components/NodeDetail";
 import ProtocolLog from "./components/ProtocolLog";
-import { mockNodes } from "./data/mockData";
+import { useNodes } from "./data/useNodes";
+import type { MonitoredNode } from "./data/types";
 
 type View = "dashboard" | "node";
 
@@ -24,11 +25,13 @@ const NAV_ITEMS = [
 
 function Sidebar({
   user,
+  nodes,
   view,
   onNavigate,
   onLogout,
 }: {
   user: string;
+  nodes: MonitoredNode[];
   view: View;
   onNavigate: (v: View) => void;
   onLogout: () => void;
@@ -84,8 +87,8 @@ function Sidebar({
         <div className="hidden sm:block px-2 mt-4 mb-2">
           <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#B3AFC060" }}>Nodos</div>
         </div>
-        {mockNodes.map(node => {
-          const dotColor = node.status === "disconnected" ? "#EF4444" : node.status === "active" ? "#22C55E" : "#6F828A";
+        {nodes.map(node => {
+          const dotColor = node.status === "disconnected" ? "#EF4444" : node.status === "active" ? "#22C55E" : node.status === "error" ? "#BE8156" : "#6F828A";
           return (
             <div key={node.id} className="hidden sm:flex items-center gap-2.5 px-3 py-1.5">
               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
@@ -128,10 +131,12 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(true);
+  // Datos reales del gateway; solo se consulta con sesión iniciada.
+  const { nodes, log } = useNodes(user !== null);
 
   if (!user) return <Login onLogin={setUser} />;
 
-  const selectedNode = selectedNodeId ? mockNodes.find(n => n.id === selectedNodeId) : null;
+  const selectedNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
 
   function handleSelectNode(id: string) {
     setSelectedNodeId(id);
@@ -147,6 +152,7 @@ export default function App() {
     <div className="flex h-full" style={{ background: "#F7F7FA" }}>
       <Sidebar
         user={user}
+        nodes={nodes}
         view={view}
         onNavigate={v => { setView(v); if (v === "dashboard") setSelectedNodeId(null); }}
         onLogout={() => setUser(null)}
@@ -198,7 +204,7 @@ export default function App() {
         <div className="flex flex-1 min-h-0" style={{ background: "#F7F7FA" }}>
           <div className="flex-1 min-w-0 overflow-auto">
             {view === "dashboard" && (
-              <Dashboard nodes={mockNodes} onSelectNode={handleSelectNode} user={user} />
+              <Dashboard nodes={nodes} onSelectNode={handleSelectNode} user={user} />
             )}
             {view === "node" && selectedNode && (
               <NodeDetail node={selectedNode} onBack={handleBack} />
@@ -207,7 +213,7 @@ export default function App() {
 
           {showLog && (
             <div className="w-60 shrink-0 hidden md:flex flex-col overflow-hidden">
-              <ProtocolLog />
+              <ProtocolLog entries={log} />
             </div>
           )}
         </div>
