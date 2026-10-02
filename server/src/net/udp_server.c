@@ -48,9 +48,12 @@ void handle_udp_message(int sockfd, struct sockaddr_in *sender, const char *raw,
     }
     text[len] = '\0';
 
-    int parsed = (nmp_parse(text, &request) == 0);
+    int rc = nmp_parse(text, &request);
+    int parsed = (rc == 0);
 
-    if (!parsed) {
+    if (rc == NMP_PARSE_UNKNOWN_TYPE) {
+        nmp_build_error(&request, "INVALID_MESSAGE", &response);
+    } else if (!parsed) {
         nmp_build_error(NULL, "INVALID_FORMAT", &response);
     } else if (request.type != NMP_STATUS) {
         /* Por UDP solo viaja STATUS (y su ACK de vuelta) — docx, sección 9. */
@@ -58,10 +61,11 @@ void handle_udp_message(int sockfd, struct sockaddr_in *sender, const char *raw,
     } else if (!is_node_registered(request.node_id)) {
         nmp_build_error(&request, "UNKNOWN_NODE", &response);
     } else {
-        update_node_state(request.node_id, request.data);
-
         if (nmp_build_response(&request, &response) != 0) {
             nmp_build_error(&request, "INVALID_MESSAGE", &response);
+        } else if (response.type == NMP_ACK) {
+            /* Solo se guarda estado si el payload pasó la validación. */
+            update_node_state(request.node_id, request.data);
         }
     }
 
@@ -71,8 +75,9 @@ void handle_udp_message(int sockfd, struct sockaddr_in *sender, const char *raw,
     if (nmp_serialize_response(&response, logged, sizeof(logged)) != 0) {
         snprintf(logged, sizeof(logged), "SERIALIZE_ERROR");
     }
-    log_request(parsed ? request.node_id : NULL,
-                parsed ? nmp_type_to_string(request.type) : "INVALID",
+    log_request(rc != -1 ? request.node_id : NULL,
+                parsed ? nmp_type_to_string(request.type)
+                       : (rc == NMP_PARSE_UNKNOWN_TYPE ? "UNKNOWN" : "INVALID"),
                 logged);
 }
 

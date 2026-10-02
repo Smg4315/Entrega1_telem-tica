@@ -14,7 +14,9 @@ int state_manager_init(void);
 void update_node_state(const char *node_id, const char *data);
 
 /* Retorna el estado actual como "K=V|K=V...", "" si el nodo no tiene métricas
- * o NULL si nunca se registró estado. El buffer es propio de cada hilo y
+ * o NULL si nunca se registró estado. Si el nodo no envía nada dentro de la
+ * ventana NMP_NODE_TIMEOUT (segundos, 60 por defecto) se agrega "DESCONECTADO"
+ * al final. El buffer es propio de cada hilo y
  * válido hasta la siguiente llamada desde ese mismo hilo. */
 const char *get_node_state(const char *node_id);
 
