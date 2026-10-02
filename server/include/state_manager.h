@@ -2,7 +2,12 @@
 #define STATE_MANAGER_H
 
 /* Estado actual por nodo (sin histórico — fuera del alcance de Fase 2).
- * El estado es un conjunto clave=valor: CPU=45|MEM=62|TEMP=38|BAT=87. */
+ * El estado es un conjunto clave=valor: CPU=45|MEM=62|TEMP=38|BAT=87.
+ * Seguro entre hilos y entre procesos creados con fork(). */
+
+/* Crea la memoria compartida. Llamar desde main() antes de fork()/hilos;
+ * idempotente (las demás funciones también la invocan). 0 ok, -1 error. */
+int state_manager_init(void);
 
 /* Fusiona los pares KEY=VALUE de data en el estado del nodo (los tokens sin
  * '=' se ignoran, ej. el nombre del evento HIGH_TEMP en un EVENT). */

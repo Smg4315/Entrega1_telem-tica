@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include "../include/node_registry.h"
+#include "../include/state_manager.h"
 
 int start_tcp_server(int port);
 void run_tcp_accept_loop(int server_fd);
@@ -23,6 +25,12 @@ int main(int argc, char *argv[]) {
 
     if (port <= 0 || port > 65535) {
         fprintf(stderr, "Error: puerto inválido.\n");
+        return 1;
+    }
+
+    /* Memoria compartida antes de crear el hilo UDP y los hijos TCP (fork). */
+    if (node_registry_init() != 0 || state_manager_init() != 0) {
+        fprintf(stderr, "Error: no se pudo crear la memoria compartida.\n");
         return 1;
     }
 
