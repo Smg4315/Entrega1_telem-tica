@@ -4,12 +4,16 @@ interface Props {
   unit?: string;
   warn?: number;
   danger?: number;
+  lowIsBad?: boolean; // batería: el valor bajo es el malo (value <= warn/danger)
 }
 
-export default function MetricGauge({ label, value, unit = "%", warn = 75, danger = 90 }: Props) {
+export default function MetricGauge({ label, value, unit = "%", warn = 75, danger = 90, lowIsBad = false }: Props) {
   const v = value ?? 0;
-  const color = value === null ? "#D1D5DB" : v >= danger ? "#EF4444" : v >= warn ? "#BE8156" : "#403662";
-  const track = v >= danger ? "#FEE2E2" : v >= warn ? "#F5ECE6" : "#E8E7EC";
+  const isDanger = value !== null && (lowIsBad ? v <= danger : v >= danger);
+  const isWarn = value !== null && (lowIsBad ? v <= warn : v >= warn);
+  const good = lowIsBad ? "#22C55E" : "#403662";
+  const color = value === null ? "#D1D5DB" : isDanger ? "#EF4444" : isWarn ? "#BE8156" : good;
+  const track = isDanger ? "#FEE2E2" : isWarn ? "#F5ECE6" : lowIsBad && value !== null ? "#DCFCE7" : "#E8E7EC";
   const pct = Math.min(100, v);
 
   return (

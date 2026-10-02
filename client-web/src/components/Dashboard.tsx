@@ -1,5 +1,5 @@
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import type { MonitoredNode } from "../data/types";
@@ -82,7 +82,7 @@ function NodeCard({ node, onSelect }: { node: MonitoredNode; onSelect: () => voi
         <div className="flex flex-col gap-2.5">
           <MetricGauge label="MEM" value={node.current.mem} />
           <MetricGauge label="TEMP" value={node.current.temp} unit="°C" warn={70} danger={85} />
-          <MetricGauge label="BAT" value={node.current.bat} warn={30} danger={15} />
+          <MetricGauge label="BAT" value={node.current.bat} warn={30} danger={15} lowIsBad />
         </div>
       )}
 
@@ -201,7 +201,7 @@ export default function Dashboard({ nodes, onSelectNode, user }: Props) {
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {statusDist.map((entry, i) => (
-                    <rect key={i} fill={entry.color} />
+                    <Cell key={i} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>

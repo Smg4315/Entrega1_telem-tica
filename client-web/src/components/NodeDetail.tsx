@@ -100,12 +100,15 @@ export default function NodeDetail({ node, onBack }: Props) {
           { label: "CPU", value: node.current.cpu, unit: "%", warn: 75, danger: 90 },
           { label: "Memoria", value: node.current.mem, unit: "%", warn: 75, danger: 90 },
           { label: "Temperatura", value: node.current.temp, unit: "°C", warn: 70, danger: 85 },
-          { label: "Batería", value: node.current.bat, unit: "%", warn: 30, danger: 15 },
+          { label: "Batería", value: node.current.bat, unit: "%", warn: 30, danger: 15, lowIsBad: true },
         ].map(m => {
           const off = isDown || m.value === null;
           const v = m.value ?? 0;
-          const color = off ? "#D1D5DB" : v >= m.danger ? "#EF4444" : v >= m.warn ? "#BE8156" : "#403662";
-          const bg = off ? "#F9FAFB" : v >= m.danger ? "#FEF2F2" : v >= m.warn ? "#FFFBEB" : "#E8E7EC";
+          // Batería: el valor bajo es el malo; en el resto, el alto.
+          const isDanger = m.lowIsBad ? v <= m.danger : v >= m.danger;
+          const isWarn = m.lowIsBad ? v <= m.warn : v >= m.warn;
+          const color = off ? "#D1D5DB" : isDanger ? "#EF4444" : isWarn ? "#BE8156" : m.lowIsBad ? "#22C55E" : "#403662";
+          const bg = off ? "#F9FAFB" : isDanger ? "#FEF2F2" : isWarn ? "#FFFBEB" : m.lowIsBad ? "#DCFCE7" : "#E8E7EC";
           return (
             <div key={m.label} className="rounded-xl border p-5 bg-white" style={{ borderColor: "#E5E7EB" }}>
               <div className="text-3xl font-bold tabular-nums" style={{ color, fontFamily: "JetBrains Mono, monospace" }}>
