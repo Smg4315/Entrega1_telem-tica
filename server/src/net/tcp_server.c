@@ -43,9 +43,10 @@ void handle_tcp_message(int client_fd, const char *raw, size_t len) {
         nmp_build_error(&request, "INVALID_MESSAGE", &response);
     } else if (request.type != NMP_REGISTER && !is_node_registered(request.node_id)) {
         nmp_build_error(&request, "UNKNOWN_NODE", &response);
+    } else if (request.type == NMP_REGISTER && register_node(request.node_id) != 0) {
+        nmp_build_error(&request, "REGISTRY_FULL", &response);
     } else {
         if (request.type == NMP_REGISTER) {
-            register_node(request.node_id);
             update_node_state(request.node_id, ""); /* inicia last_seen */
         }
 

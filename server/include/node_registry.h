@@ -11,7 +11,9 @@ int node_registry_init(void);
 /* Retorna 1 si node_id ya envió REGISTER, 0 si no. */
 int is_node_registered(const char *node_id);
 
-/* Registra node_id; idempotente. Si el registro está lleno, lo informa por stderr. */
-void register_node(const char *node_id);
+/* Registra node_id; idempotente (un nodo ya registrado retorna 0).
+ * Retorna 0 si quedó registrado, -1 si el registro está lleno o node_id es
+ * inválido. */
+int register_node(const char *node_id);
 
 #endif

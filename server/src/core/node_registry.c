@@ -68,10 +68,12 @@ int is_node_registered(const char *node_id) {
     return found;
 }
 
-void register_node(const char *node_id) {
+int register_node(const char *node_id) {
+    int rc = 0;
+
     if (node_id == NULL || node_id[0] == '\0' || strlen(node_id) >= NODE_ID_LEN ||
         node_registry_init() != 0) {
-        return;
+        return -1;
     }
 
     pthread_mutex_lock(&reg->lock);
@@ -81,8 +83,10 @@ void register_node(const char *node_id) {
             strcpy(reg->ids[reg->count++], node_id);
         } else {
             fprintf(stderr, "node_registry: lleno, no se registró %s\n", node_id);
+            rc = -1;
         }
     }
 
     pthread_mutex_unlock(&reg->lock);
+    return rc;
 }

@@ -124,9 +124,10 @@ ERROR|<id>|<codigo>|<node_id>
 | `INVALID_MESSAGE` | La estructura es correcta, pero el tipo no es aceptable: tipo desconocido, tipo que solo emite el servidor (ACK, RESPONSE, ERROR) o tipo enviado por el transporte equivocado | `FOO\|1\|NODE01\|x` | `ERROR\|1\|INVALID_MESSAGE\|NODE01` |
 | `UNKNOWN_NODE` | STATUS, EVENT o QUERY sobre un nodo que no ha hecho `REGISTER` | `QUERY\|101\|NODE99\|CURRENT` | `ERROR\|101\|UNKNOWN_NODE\|NODE99` |
 | `INVALID_PARAMETER` | STATUS o EVENT sin ningún par `CLAVE=VALOR` en DATOS; QUERY con un valor distinto de `CURRENT` | `EVENT\|4\|NODE01\|HIGH_TEMP` | `ERROR\|4\|INVALID_PARAMETER\|NODE01` |
+| `REGISTRY_FULL` | `REGISTER` de un nodo nuevo cuando ya hay 64 nodos registrados. El nodo no queda registrado. Repetir `REGISTER` de un nodo ya registrado sigue devolviendo `ACK` | `REGISTER\|65\|NODE65` | `ERROR\|65\|REGISTRY_FULL\|NODE65` |
 | `UNAUTHORIZED` | Usuario no autenticado. **Documentado, no implementado en Fase 3:** el servidor nunca lo emite | — | — |
 
-Orden de validación del servidor: (1) estructura y tipo conocido, (2) transporte, (3) nodo registrado, (4) tipo válido como solicitud y parámetros. Un mensaje con varios problemas recibe solo el primer error de esa lista.
+Orden de validación del servidor: (1) estructura y tipo conocido, (2) transporte, (3) nodo registrado (o cupo disponible, si es `REGISTER`), (4) tipo válido como solicitud y parámetros. Un mensaje con varios problemas recibe solo el primer error de esa lista.
 
 Consecuencia de ese orden: si un cliente envía por TCP un ACK, RESPONSE o ERROR, el servidor toma su tercer campo como NODE_ID. Si ese valor no es un nodo registrado, la respuesta es `UNKNOWN_NODE`; solo si lo es, la respuesta es `INVALID_MESSAGE`. Por UDP la respuesta es siempre `INVALID_MESSAGE`.
 
@@ -176,7 +177,7 @@ TCP y UDP escuchan en el mismo número de puerto.
 | ID | Solo dígitos, máximo 15, valor máximo 4294967295 | `INVALID_FORMAT` |
 | NODE_ID | 31 caracteres | `INVALID_FORMAT` |
 | DATOS | 255 caracteres | `INVALID_FORMAT` |
-| Nodos registrados | 64 | Limitación conocida: el nodo 65 recibe `ACK` pero no queda registrado (el servidor lo informa en su salida de error); sus mensajes posteriores reciben `UNKNOWN_NODE` |
+| Nodos registrados | 64 | El `REGISTER` del nodo 65 recibe `ERROR\|<id>\|REGISTRY_FULL\|<node_id>` y el nodo no queda registrado; sus mensajes posteriores reciben `UNKNOWN_NODE`. No hay forma de dar de baja un nodo: el cupo se libera solo al reiniciar el servidor |
 | Métricas por nodo | 16; clave y valor de hasta 31 caracteres cada uno | El par que excede el límite se ignora sin error |
 
 ### Transporte estricto
