@@ -38,6 +38,9 @@ void handle_tcp_message(int client_fd, const char *raw, size_t len) {
         nmp_build_error(&request, "INVALID_MESSAGE", &response);
     } else if (!parsed) {
         nmp_build_error(NULL, "INVALID_FORMAT", &response);
+    } else if (request.type == NMP_STATUS) {
+        /* STATUS solo viaja por UDP — docx, sección 9. */
+        nmp_build_error(&request, "INVALID_MESSAGE", &response);
     } else if (request.type != NMP_REGISTER && !is_node_registered(request.node_id)) {
         nmp_build_error(&request, "UNKNOWN_NODE", &response);
     } else {
@@ -48,8 +51,7 @@ void handle_tcp_message(int client_fd, const char *raw, size_t len) {
 
         if (nmp_build_response(&request, &response) != 0) {
             nmp_build_error(&request, "INVALID_MESSAGE", &response);
-        } else if (response.type == NMP_ACK &&
-                   (request.type == NMP_STATUS || request.type == NMP_EVENT)) {
+        } else if (response.type == NMP_ACK && request.type == NMP_EVENT) {
             /* Solo se guarda estado si el payload pasó la validación. */
             update_node_state(request.node_id, request.data);
         }
