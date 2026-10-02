@@ -4,6 +4,26 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 1 si data trae al menos un token KEY=VALUE con KEY no vacía. */
+static int has_key_value(const char *data) {
+    const char *p = data;
+
+    while (*p != '\0') {
+        size_t tok_len = strcspn(p, "|");
+        const char *eq = memchr(p, '=', tok_len);
+
+        if (eq != NULL && eq != p) {
+            return 1;
+        }
+
+        p += tok_len;
+        if (*p == '|') {
+            ++p;
+        }
+    }
+    return 0;
+}
+
 int nmp_build_response(
     const nmp_message_t *request,
     nmp_message_t *response
@@ -30,12 +50,20 @@ int nmp_build_response(
             break;
 
         case NMP_STATUS:
+            if (!has_key_value(request->data)) {
+                nmp_build_error(request, "INVALID_PARAMETER", response);
+                break;
+            }
             response->type = NMP_ACK;
             strncpy(response->data, "STATUS",
                     sizeof(response->data) - 1);
             break;
 
         case NMP_EVENT:
+            if (!has_key_value(request->data)) {
+                nmp_build_error(request, "INVALID_PARAMETER", response);
+                break;
+            }
             response->type = NMP_ACK;
             strncpy(response->data, "EVENT",
                     sizeof(response->data) - 1);

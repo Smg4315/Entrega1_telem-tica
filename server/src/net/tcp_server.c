@@ -9,6 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -21,6 +22,7 @@
 
 #define TCP_BACKLOG 10
 #define TCP_BUF_SIZE 512
+#define TCP_RECV_TIMEOUT_S 30
 
 void handle_tcp_message(int client_fd, const char *raw, size_t len) {
     nmp_message_t request;
@@ -29,21 +31,27 @@ void handle_tcp_message(int client_fd, const char *raw, size_t len) {
 
     (void)len;
 
-    int parsed = (nmp_parse(raw, &request) == 0);
+    int rc = nmp_parse(raw, &request);
+    int parsed = (rc == 0);
 
-    if (!parsed) {
+    if (rc == NMP_PARSE_UNKNOWN_TYPE) {
+        nmp_build_error(&request, "INVALID_MESSAGE", &response);
+    } else if (!parsed) {
         nmp_build_error(NULL, "INVALID_FORMAT", &response);
     } else if (request.type != NMP_REGISTER && !is_node_registered(request.node_id)) {
         nmp_build_error(&request, "UNKNOWN_NODE", &response);
     } else {
         if (request.type == NMP_REGISTER) {
             register_node(request.node_id);
-        } else if (request.type == NMP_STATUS || request.type == NMP_EVENT) {
-            update_node_state(request.node_id, request.data);
+            update_node_state(request.node_id, ""); /* inicia last_seen */
         }
 
         if (nmp_build_response(&request, &response) != 0) {
             nmp_build_error(&request, "INVALID_MESSAGE", &response);
+        } else if (response.type == NMP_ACK &&
+                   (request.type == NMP_STATUS || request.type == NMP_EVENT)) {
+            /* Solo se guarda estado si el payload pasó la validación. */
+            update_node_state(request.node_id, request.data);
         }
     }
 
@@ -58,8 +66,9 @@ void handle_tcp_message(int client_fd, const char *raw, size_t len) {
         perror("send_message");
     }
 
-    log_request(parsed ? request.node_id : NULL,
-                parsed ? nmp_type_to_string(request.type) : "INVALID",
+    log_request(rc != -1 ? request.node_id : NULL,
+                parsed ? nmp_type_to_string(request.type)
+                       : (rc == NMP_PARSE_UNKNOWN_TYPE ? "UNKNOWN" : "INVALID"),
                 response_buffer);
 }
 
@@ -110,6 +119,13 @@ static void reap_children(int sig) {
 static void serve_client(int client_fd) {
     char buf[TCP_BUF_SIZE];
 
+    /* Un cliente inactivo no retiene al hijo para siempre: recv() falla con
+     * EAGAIN/EWOULDBLOCK al vencer el plazo y se cierra la conexión. */
+    struct timeval tv = { .tv_sec = TCP_RECV_TIMEOUT_S, .tv_usec = 0 };
+    if (setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+        perror("setsockopt SO_RCVTIMEO");
+    }
+
     /* Una conexión puede traer varios mensajes seguidos hasta que el
      * cliente haga FIN (n==0) o ocurra un error real (n==-1). */
     for (;;) {
@@ -118,8 +134,19 @@ static void serve_client(int client_fd) {
             handle_tcp_message(client_fd, buf, (size_t)n);
             continue;
         }
+        if (n == MSG_IO_INVALID) {
+            /* Línea vacía o demasiado larga: buf llega vacío, así que el
+             * parser falla y se responde INVALID_FORMAT sin cerrar. */
+            handle_tcp_message(client_fd, buf, 0);
+            continue;
+        }
         if (n == 0) {
             break; /* el cliente cerró su lado de escritura */
+        }
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            fprintf(stderr, "recv_message: timeout de %d s, se cierra la conexión\n",
+                    TCP_RECV_TIMEOUT_S);
+            break;
         }
         perror("recv_message");
         break; /* error real: cerrar esta conexión sin tumbar el servidor */

@@ -23,8 +23,14 @@ typedef struct {
     char            data[256];
 } nmp_message_t;
 
+/* Estructura válida (campos e ID) pero TIPO desconocido -> INVALID_MESSAGE. */
+#define NMP_PARSE_UNKNOWN_TYPE (-2)
+
 /* Parser del protocolo NMP. Debe aceptar mensajes con payload que puede incluir
- * separadores | a partir del campo DATOS. */
+ * separadores | a partir del campo DATOS.
+ *   0  -> mensaje válido.
+ *  -1  -> no se pudo parsear (campos faltantes, ID no numérico...): INVALID_FORMAT.
+ *  NMP_PARSE_UNKNOWN_TYPE -> out trae id/node_id/data, pero out->type no es válido. */
 int nmp_parse(const char *raw, nmp_message_t *out);
 
 #endif

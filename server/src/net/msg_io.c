@@ -12,10 +12,14 @@ ssize_t recv_message(int fd, char *buf, size_t maxlen) {
     }
 
     size_t used = 0;
+    int too_long = 0;
 
     /* Lee byte a byte hasta el delimitador '\n' para no consumir bytes
-     * del siguiente mensaje que puedan venir pegados en el mismo flujo. */
-    while (used < maxlen - 1) {
+     * del siguiente mensaje que puedan venir pegados en el mismo flujo.
+     * Línea demasiado larga: se rechaza en vez de agrandar el buffer (el
+     * parser tiene el mismo límite); se descarta el resto hasta el '\n'
+     * para que la cola no se interprete como otro mensaje. */
+    for (;;) {
         char c;
         ssize_t n = recv(fd, &c, 1, 0);
 
@@ -23,7 +27,11 @@ ssize_t recv_message(int fd, char *buf, size_t maxlen) {
             if (c == '\n') {
                 break;
             }
-            buf[used++] = c;
+            if (used < maxlen - 1) {
+                buf[used++] = c;
+            } else {
+                too_long = 1;
+            }
             continue;
         }
 
@@ -40,7 +48,17 @@ ssize_t recv_message(int fd, char *buf, size_t maxlen) {
             continue; /* syscall interrumpida por una señal, no es un error real */
         }
 
-        return -1; /* error real (ej. ECONNRESET) */
+        return -1; /* error real (ej. ECONNRESET) o timeout (EAGAIN) */
+    }
+
+    /* Se quita el '\r' final para aceptar también líneas terminadas en CRLF. */
+    if (used > 0 && buf[used - 1] == '\r') {
+        used--;
+    }
+
+    if (too_long || used == 0) {
+        buf[0] = '\0';
+        return MSG_IO_INVALID; /* línea vacía o demasiado larga: no es FIN */
     }
 
     buf[used] = '\0';
@@ -66,7 +84,9 @@ int send_message(int fd, const char *msg) {
             chunk_len = 1;
         }
 
-        ssize_t n = send(fd, chunk, chunk_len, 0);
+        /* MSG_NOSIGNAL: si el peer ya cerró, send() devuelve EPIPE en vez de
+         * matar al proceso con SIGPIPE. */
+        ssize_t n = send(fd, chunk, chunk_len, MSG_NOSIGNAL);
 
         if (n > 0) {
             sent += (size_t)n; /* escritura parcial: se reintenta con el resto */

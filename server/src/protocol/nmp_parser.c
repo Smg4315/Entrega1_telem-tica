@@ -75,6 +75,7 @@ int nmp_parse(const char *raw, nmp_message_t *out) {
     size_t type_len = 0U;
     size_t node_len = 0U;
     size_t data_len = 0U;
+    int result = 0;
 
     if (raw == NULL || out == NULL) {
         return -1;
@@ -95,8 +96,13 @@ int nmp_parse(const char *raw, nmp_message_t *out) {
     *first_sep = '\0';
 
     type_len = strlen(buffer);
-    if (type_len == 0U || nmp_parse_type(buffer, &out->type) != 0) {
+    if (type_len == 0U) {
         return -1;
+    }
+    /* Tipo desconocido: se sigue validando la estructura para distinguir
+     * INVALID_MESSAGE (solo falla el tipo) de INVALID_FORMAT. */
+    if (nmp_parse_type(buffer, &out->type) != 0) {
+        result = NMP_PARSE_UNKNOWN_TYPE;
     }
 
     second_sep = strchr(first_sep + 1, '|');
@@ -142,5 +148,5 @@ int nmp_parse(const char *raw, nmp_message_t *out) {
         out->node_id[node_len] = '\0';
     }
 
-    return 0;
+    return result;
 }

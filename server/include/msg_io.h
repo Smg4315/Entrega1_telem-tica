@@ -10,13 +10,18 @@
  * recv_message: bloquea hasta completar un mensaje, ver FIN o error.
  *   Retorno > 0 -> bytes del mensaje en buf (sin '\n', con '\0' final).
  *   Retorno == 0 -> el peer cerró la conexión (FIN), sin mensaje completo.
- *   Retorno == -1 -> error real de socket (revisar errno reportado por perror).
+ *   Retorno == -1 -> error real de socket (revisar errno reportado por perror);
+ *                    incluye el timeout de SO_RCVTIMEO (errno EAGAIN/EWOULDBLOCK).
+ *   Retorno == MSG_IO_INVALID -> línea vacía o más larga que maxlen-1; ya se
+ *                    consumió hasta el '\n' y la conexión sigue abierta.
  *
  * send_message: envía msg completo (agrega '\n' si no lo trae) reintentando
  * hasta escribir todos los bytes.
  *   Retorno 0 -> enviado completo.
  *   Retorno -1 -> error real de socket.
  */
+#define MSG_IO_INVALID (-2)
+
 ssize_t recv_message(int fd, char *buf, size_t maxlen);
 int send_message(int fd, const char *msg);
 

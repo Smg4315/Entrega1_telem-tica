@@ -6,9 +6,12 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <time.h>
 
+#define NODE_TIMEOUT_DEFAULT_S 60
 #define MAX_NODES     64
 #define NODE_ID_LEN   32
 #define MAX_METRICS   16
@@ -25,6 +28,7 @@ typedef struct {
     char     node_id[NODE_ID_LEN];
     metric_t metrics[MAX_METRICS];
     int      metric_count;
+    time_t   last_seen; /* último REGISTER/STATUS/EVENT aceptado */
 } node_state_t;
 
 typedef struct {
@@ -58,6 +62,15 @@ static void state_table_create(void) {
 int state_manager_init(void) {
     pthread_once(&tbl_once, state_table_create);
     return (tbl != NULL) ? 0 : -1;
+}
+
+/* Ventana de inactividad en segundos: variable de entorno NMP_NODE_TIMEOUT,
+ * o NODE_TIMEOUT_DEFAULT_S si no está definida o no es un entero positivo. */
+static long node_timeout_seconds(void) {
+    const char *env = getenv("NMP_NODE_TIMEOUT");
+    long value = (env != NULL) ? atol(env) : 0;
+
+    return (value > 0) ? value : NODE_TIMEOUT_DEFAULT_S;
 }
 
 /* Requiere tbl->lock tomado. */
@@ -116,6 +129,7 @@ void update_node_state(const char *node_id, const char *data) {
         memset(st, 0, sizeof(*st));
         strcpy(st->node_id, node_id);
     }
+    st->last_seen = time(NULL);
 
     /* Recorre data token a token (separador '|') y fusiona los KEY=VALUE. */
     const char *p = (data != NULL) ? data : "";
@@ -161,6 +175,15 @@ const char *get_node_state(const char *node_id) {
             break; /* no cabe: se devuelve lo acumulado hasta aquí */
         }
         used += (size_t)n;
+    }
+
+    /* Nodo sin mensajes dentro de la ventana: se reporta como desconectado. */
+    if (time(NULL) - st->last_seen > node_timeout_seconds()) {
+        int n = snprintf(out + used, sizeof(out) - used, "%sDESCONECTADO",
+                         (used > 0) ? "|" : "");
+        if (n > 0 && (size_t)n < sizeof(out) - used) {
+            used += (size_t)n;
+        }
     }
     out[used] = '\0';
 
