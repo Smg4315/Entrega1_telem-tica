@@ -2,11 +2,21 @@
 (feed en vivo de mensajes NMP) para client-web/.
 """
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from .http.auth_routes import router as auth_router
 from .http.query_routes import router as query_router
 from .ws.live_feed import connected_clients
 
 app = FastAPI(title="NetMonitor Gateway")
+
+# CORS solo para desarrollo local: el front (Vite, puerto 5173) corre en un
+# origen distinto al del gateway y el navegador bloquearía sus fetch().
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 app.include_router(auth_router)
 app.include_router(query_router)
 
