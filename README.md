@@ -1,7 +1,4 @@
-Claude
 
-
-Readme · MD
 # NetMonitor
  
 Sistema distribuido de monitoreo y control de infraestructura — Telemática, Entrega 1.
@@ -60,7 +57,7 @@ Especificación completa, tipos de mensaje y códigos de error en [`docs/protoco
 ```
 3. Dentro de WSL, instalar compilador y Python:
 ```bash
-   sudo apt install -y build-essential python3-venv python3-pip netcat-openbsd
+   sudo apt install -y build-essential python3-venv python3-pip
 ```
 4. Tener instalado Node.js 18 o superior (en Windows o en WSL).
 > El servidor requiere **Linux/WSL**: usa headers POSIX (`sys/socket.h`) que no existen en Windows nativo. El gateway y el cliente web pueden correr en Windows o en WSL.
@@ -152,7 +149,7 @@ Se necesitan **4 terminales abiertas al mismo tiempo**. Todos los comandos parte
  
 Todos los comandos se ejecutan en la **Terminal 4**, desde `server/`. Las comillas alrededor de cada mensaje son obligatorias (el carácter `|` es especial en la terminal).
  
-### Parte 1 — Flujo normal
+### Parte 1 — Creación de dos nodos
  
 1. Registrar el nodo NODE01 por TCP:
 ```bash
@@ -163,22 +160,16 @@ Todos los comandos se ejecutan en la **Terminal 4**, desde `server/`. Las comill
 ```bash
    python3 client_test.py udp "STATUS|002|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87"
 ```
-4. Resultado esperado: el servidor confirma la recepción.
-5. Consultar el estado de NODE01 por TCP:
-```bash
-   python3 client_test.py tcp "QUERY|003|NODE01|CURRENT"
-```
-6. Resultado esperado: respuesta `RESPONSE` con las métricas enviadas.
-7. Revisar el dashboard en `http://localhost:5173`: NODE01 aparece **Activo** con sus métricas (esperar unos segundos por el polling).
-8. Registrar un segundo nodo:
+4. Registrar el nodo NODE02 por TCP:
 ```bash
    python3 client_test.py tcp "REGISTER|011|NODE02"
 ```
-9. Enviar métricas del segundo nodo:
+5. Resultado esperado: respuesta `ACK`.
+6. Enviar métricas de NODE02 por UDP:
 ```bash
    python3 client_test.py udp "STATUS|012|NODE02|CPU=30|MEM=40|TEMP=35|BAT=95"
 ```
-10. Resultado esperado: el dashboard muestra los dos nodos activos.
+7. Revisar el dashboard en `http://localhost:5173`: NODE01 y NODE02 aparecen **Activos** con sus métricas (esperar unos segundos por el polling).
 ### Parte 2 — Manejo de errores
  
 1. Consultar un nodo no registrado:
@@ -201,116 +192,35 @@ Todos los comandos se ejecutan en la **Terminal 4**, desde `server/`. Las comill
    python3 client_test.py tcp "REGISTER"
 ```
 8. Resultado esperado: `ERROR` con código `INVALID_FORMAT`.
-### Parte 3 — Concurrencia
+### Parte 3 — Timeout pasivo (nodo desconectado)
  
-1. Abrir una **Terminal 5** (WSL) y dejar una conexión TCP abierta sin enviar nada:
-```bash
-   nc localhost 8080
-```
-2. Sin cerrar la Terminal 5, en la Terminal 4 registrar otro nodo:
-```bash
-   python3 client_test.py tcp "REGISTER|040|NODE03"
-```
-3. Resultado esperado: el `ACK` llega al instante, aunque la Terminal 5 mantiene otra conexión abierta (cada conexión TCP tiene su propio proceso).
-4. Ver los procesos del servidor (un hijo por conexión abierta):
-```bash
-   ps -ef --forest | grep -v grep | grep "bin/server"
-```
-5. Con la Terminal 5 aún abierta, enviar un STATUS por UDP:
-```bash
-   python3 client_test.py udp "STATUS|041|NODE03|CPU=20|MEM=30|TEMP=33|BAT=99"
-```
-6. Resultado esperado: respuesta inmediata (el UDP lo atiende un hilo independiente).
-7. Consultar el nodo desde otra conexión:
-```bash
-   python3 client_test.py tcp "QUERY|042|NODE03|CURRENT"
-```
-8. Resultado esperado: el nodo existe con sus métricas, lo que demuestra que todos los procesos comparten el mismo estado (memoria `mmap`).
-9. Cerrar la Terminal 5 con `Ctrl + C` (o esperar 30 s: el servidor la cierra solo por `SO_RCVTIMEO`).
-### Parte 4 — Timeout pasivo (nodo desconectado)
+Se usa NODE01, registrado en la Parte 1, con el servidor encendido y la configuración por defecto (60 s).
  
-1. En la Terminal 1, detener el servidor: `Ctrl + C`
-2. Reiniciarlo con un timeout corto de 10 segundos para la demo:
+1. Enviar un STATUS de NODE01 para reiniciar su última señal:
 ```bash
-   NMP_NODE_TIMEOUT=10 ./bin/server 8080
+   python3 client_test.py udp "STATUS|050|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87"
 ```
-3. En la Terminal 4, registrar el nodo:
+2. Consultar de inmediato:
 ```bash
-   python3 client_test.py tcp "REGISTER|050|NODE01"
+   python3 client_test.py tcp "QUERY|051|NODE01|CURRENT"
 ```
-4. Enviar un único STATUS:
-```bash
-   python3 client_test.py udp "STATUS|051|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87"
-```
-5. Consultar de inmediato:
+3. Resultado esperado: respuesta normal (nodo activo).
+4. Esperar más de 60 segundos sin enviar STATUS de NODE01.
+5. Consultar de nuevo:
 ```bash
    python3 client_test.py tcp "QUERY|052|NODE01|CURRENT"
 ```
-6. Resultado esperado: respuesta normal (nodo activo).
-7. Esperar más de 10 segundos sin enviar STATUS.
-8. Consultar de nuevo:
+6. Resultado esperado: la respuesta termina en `|DESCONECTADO` y el dashboard muestra NODE01 como **Desconectado**.
+7. Enviar un nuevo STATUS:
 ```bash
-   python3 client_test.py tcp "QUERY|053|NODE01|CURRENT"
+   python3 client_test.py udp "STATUS|053|NODE01|CPU=40|MEM=60|TEMP=37|BAT=86"
 ```
-9. Resultado esperado: la respuesta termina en `|DESCONECTADO` y el dashboard muestra el nodo como **Desconectado**.
-10. Enviar un nuevo STATUS:
+8. Consultar otra vez:
 ```bash
-    python3 client_test.py udp "STATUS|054|NODE01|CPU=40|MEM=60|TEMP=37|BAT=86"
+   python3 client_test.py tcp "QUERY|054|NODE01|CURRENT"
 ```
-11. Resultado esperado: el siguiente QUERY y el dashboard vuelven a mostrar el nodo **Activo**, sin volver a registrarlo.
-> Un QUERY no renueva la última señal del nodo: solo STATUS y EVENT lo hacen. Por defecto el timeout es de 60 s.
- 
-### Parte 5 — Caída del servidor
- 
-1. En la Terminal 1, detener el servidor: `Ctrl + C`
-2. Intentar registrar un nodo desde la Terminal 4:
-```bash
-   python3 client_test.py tcp "REGISTER|060|NODE01"
-```
-3. Resultado esperado: `ConnectionRefusedError: [Errno 111] Connection refused` (no hay servidor escuchando en el puerto 8080).
-4. Consultar al gateway desde una terminal libre **del mismo entorno donde corre el gateway**:
-   - Si el gateway corre en WSL, usar una terminal WSL:
-```bash
-     curl -i http://127.0.0.1:8011/nodos/NODE01/historico
-```
-   - Si el gateway corre en PowerShell, usar PowerShell:
-```powershell
-     curl.exe -i http://127.0.0.1:8011/nodos/NODE01/historico
-```
-   - Alternativa sin terminal: abrir `http://127.0.0.1:8011/nodos/NODE01/historico` en el navegador.
-5. Resultado esperado: HTTP `502` con `SERVER_UNREACHABLE` (el gateway captura el error de conexión y no se cae). El 502 también aparece en la Terminal 2, en el log de uvicorn.
-   - Si en cambio sale `curl: (7) Failed to connect ... port 8011`, el `curl` no llegó al gateway: o el gateway no está corriendo, o está en el otro entorno (WSL / PowerShell). Para ver dónde escucha el puerto 8011, en WSL:
-```bash
-     ss -tlnp | grep 8011
-```
-   - En PowerShell:
-```powershell
-     netstat -ano | findstr 8011
-```
-6. Revisar el dashboard: los nodos pasan a estado **Error**, pero la página sigue funcionando.
-7. Reiniciar el servidor en la Terminal 1:
-```bash
-   ./bin/server 8080
-```
-8. Volver a registrar el nodo (el registro vivía en memoria y se perdió):
-```bash
-   python3 client_test.py tcp "REGISTER|061|NODE01"
-```
-9. Enviar sus métricas:
-```bash
-   python3 client_test.py udp "STATUS|062|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87"
-```
-10. Resultado esperado: el dashboard se recupera solo en el siguiente ciclo de polling, sin reiniciar el gateway ni el frontend.
-> En PowerShell se usa `curl.exe` porque `curl` es un alias de otro comando. Desde WSL, `127.0.0.1` apunta a WSL y no a Windows: por eso el `curl` debe hacerse en el mismo entorno que el gateway.
- 
-#### Respuestas posibles del gateway
- 
-| Situación | Código HTTP | Contenido |
-|---|---|---|
-| Servidor apagado | `502` | `SERVER_UNREACHABLE` |
-| Servidor encendido y nodo registrado | `200` | JSON con las métricas del nodo |
-| Servidor encendido y nodo no registrado | `404` | `UNKNOWN_NODE` |
-| Otro error del protocolo NMP | `400` | Código de error NMP |
+9. Resultado esperado: NODE01 vuelve a estar **Activo** en la respuesta y en el dashboard, sin volver a registrarlo.
+> El servidor no se reinicia en ningún momento. Un QUERY no renueva la última señal del nodo: solo STATUS y EVENT lo hacen. El tiempo de 60 s es el valor por defecto de `NMP_NODE_TIMEOUT`.
  
 ## Decisiones de diseño
  
@@ -337,4 +247,3 @@ netmonitor/
     └── protocolo-NMP.md
 ```
  
-Claude finished the response
