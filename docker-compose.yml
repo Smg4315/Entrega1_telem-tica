@@ -1,0 +1,42 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "8080:8080/tcp"
+      - "8080:8080/udp"   # STATUS viaja por UDP
+    environment:
+      # Segundos sin mensajes para marcar un nodo DESCONECTADO (por defecto 60).
+      # Con STATUS cada 3 s, hacen falta 5 datagramas perdidos seguidos.
+      NMP_NODE_TIMEOUT: "15"
+    volumes:
+      - ./logs:/app/logs  # logs/server.log queda en el host
+
+  gateway:
+    build: ./gateway
+    environment:
+      NMP_HOST: server    # nombre del servicio en la red de Docker
+      NMP_PORT: "8080"
+    ports:
+      - "8011:8011"
+    depends_on:
+      - server
+
+  client-web:
+    build: ./client-web
+    environment:
+      # localhost: el código corre en el navegador del host, fuera de la red de Docker.
+      VITE_GATEWAY_URL: http://localhost:8011
+    ports:
+      - "5173:5173"
+    depends_on:
+      - gateway
+
+  node-simulator:
+    build: ./node-simulator
+    environment:
+      NMP_HOST: server
+      NMP_PORT: "8080"
+      NODES: NODE01,NODE02  # los mismos IDs que KNOWN_NODES en client-web/src/config.ts
+      INTERVAL: "3"
+    depends_on:
+      - server
