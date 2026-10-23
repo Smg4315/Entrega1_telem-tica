@@ -151,16 +151,23 @@ Todos los comandos se ejecutan en la **Terminal 4**, desde `server/`. Las comill
 ```bash
    python3 client_test.py udp "STATUS|002|NODE01|CPU=45|MEM=62|TEMP=38|BAT=87"
 ```
-4. Registrar el nodo NODE02 por TCP:
+4. Consultar el estado de NODE01 por TCP:
+```bash
+   python3 client_test.py tcp "QUERY|003|NODE01|CURRENT"
+```
+5. Resultado esperado: respuesta `RESPONSE` con las métricas enviadas (CPU, MEM, TEMP y BAT).
+
+6. Registrar el nodo NODE02 por TCP:
 ```bash
    python3 client_test.py tcp "REGISTER|011|NODE02"
 ```
-5. Resultado esperado: respuesta `ACK`.
-6. Enviar métricas de NODE02 por UDP:
+7. Resultado esperado: respuesta `ACK`.
+   
+8. Enviar métricas de NODE02 por UDP:
 ```bash
    python3 client_test.py udp "STATUS|012|NODE02|CPU=30|MEM=40|TEMP=35|BAT=95"
 ```
-7. Revisar el dashboard en `http://localhost:5173`: NODE01 y NODE02 aparecen **Activos** con sus métricas (esperar unos segundos por el polling).
+9. Revisar el dashboard en `http://localhost:5173`: NODE01 y NODE02 aparecen **Activos** con sus métricas (esperar unos segundos por el polling).
 ### Parte 2 — Manejo de errores
  
 1. Consultar un nodo no registrado:
