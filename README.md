@@ -85,43 +85,34 @@ Se necesitan **4 terminales abiertas al mismo tiempo**. Todos los comandos parte
 4. Dejar esta terminal abierta (muestra los logs en vivo).
 > Si `make` responde *"Nothing to be done for 'all'"*, el servidor ya está compilado: pasar directo al paso 3.
  
-### Terminal 2 — gateway (WSL)
+### Terminal 2 — gateway (PowerShell)
  
-1. Entrar a la carpeta del gateway:
-```bash
+1. Abrir una ventana de PowerShell y entrar a la carpeta del gateway:
+```powershell
    cd gateway
 ```
 2. Crear el entorno virtual (solo la primera vez):
-```bash
-   python3 -m venv .venv
-```
-3. Activar el entorno virtual:
-```bash
-   source .venv/bin/activate
-```
-4. Instalar dependencias (solo la primera vez):
-```bash
-   pip install -r requirements.txt
-```
-5. Iniciar el gateway:
-```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
-```
- 
-**Alternativa en PowerShell** (pasos 2 y 3):
- 
-1. Crear el entorno virtual (solo la primera vez):
 ```powershell
    python -m venv .venv
 ```
-2. Activar el entorno virtual:
+3. Activar el entorno virtual:
 ```powershell
    .venv\Scripts\Activate.ps1
 ```
-3. Solo si aparece *"la ejecución de scripts está deshabilitada"*, ejecutar una vez y repetir el paso anterior:
+4. Solo si aparece *"la ejecución de scripts está deshabilitada"*, ejecutar una vez y repetir el paso 3:
 ```powershell
    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
+5. Instalar dependencias (solo la primera vez):
+```powershell
+   pip install -r requirements.txt
+```
+6. Iniciar el gateway:
+```powershell
+   uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
+```
+7. Resultado esperado: la terminal muestra `Uvicorn running on http://0.0.0.0:8011`.
+
  
 ### Terminal 3 — cliente web (WSL o PowerShell)
  
